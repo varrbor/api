@@ -2,7 +2,7 @@
 /* Generates 10 fake users */
 
 const faker = require('faker');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 const gravatar = require('../gravatar');
 
