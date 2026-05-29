@@ -3,7 +3,7 @@ const User = require('./user');
 
 const models = {
   Note,
-  User
+  User,
 };
 
 module.exports = models;

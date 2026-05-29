@@ -25,17 +25,18 @@ PORT=4000  # optional, defaults to 4000
 
 MongoDB must be running locally. On macOS with Homebrew: `brew services start mongodb-community@4.4`.
 
-**Node.js v22+ compatibility:** `node_modules/buffer-equal-constant-time/index.js` line 4 must read `var SlowBuffer = require('buffer').SlowBuffer || Buffer;` — `SlowBuffer` was removed from Node.js v22 and the pinned dependency version references it directly.
+**Node.js v22+ compatibility:** `node_modules/buffer-equal-constant-time/index.js` line 4 must read `var SlowBuffer = require('buffer').SlowBuffer || Buffer;` — `SlowBuffer` was removed from Node.js v22 and the pinned `jwa` dependency (used by `jsonwebtoken`) references it directly. This patch is lost on every `npm install` and must be reapplied.
 
 ## Architecture
 
 This is a GraphQL API built with Apollo Server + Express, backed by MongoDB via Mongoose.
 
-**Entry point:** `src/index.js` — sets up Express + Apollo Server, reads the JWT from `Authorization` header on every request, decodes it with `jsonwebtoken`, and injects the resulting `user` object into the Apollo context alongside the Mongoose `models`.
+**Entry point:** `src/index.js` — sets up Express 5 + Apollo Server 5 (via `@as-integrations/express5`), reads the JWT from `Authorization` header (bare token or `Bearer <token>`), decodes it with `jsonwebtoken`, and injects the resulting `user` object into the Apollo context alongside the Mongoose `models`. Apollo Server must be `await server.start()`-ed before mounting the Express middleware.
 
 **GraphQL layer:**
-- `src/schema.js` — single SDL file defining all types (`Note`, `User`, `NoteFeed`) and all Query/Mutation signatures
-- `src/resolvers/` — split by concern: `query.js`, `mutation.js`, `note.js` (field resolvers for Note), `user.js` (field resolvers for User). Assembled in `resolvers/index.js` along with the `DateTime` scalar.
+- `src/schema.js` — single SDL file using `graphql-tag` defining all types (`Note`, `User`, `NoteFeed`) and all Query/Mutation signatures
+- `src/resolvers/` — split by concern: `query.js`, `mutation.js`, `note.js` (field resolvers for Note), `user.js` (field resolvers for User). Assembled in `resolvers/index.js` along with the `DateTime` scalar from `graphql-scalars`.
+- Auth errors use `GraphQLError` from `graphql` with `extensions: { code: 'UNAUTHENTICATED' | 'FORBIDDEN' }` — there is no `AuthenticationError`/`ForbiddenError` helper since Apollo Server 4+.
 
 **Data layer:**
 - `src/db.js` — singleton Mongoose connection helper; called once at startup with the `DB_HOST` env var

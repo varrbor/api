@@ -6,5 +6,5 @@ module.exports = {
   // Resolve the list of favorites for a user when requested
   favorites: async (user, args, { models }) => {
     return await models.Note.find({ favoritedBy: user._id }).sort({ _id: -1 });
-  }
+  },
 };
