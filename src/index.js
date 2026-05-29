@@ -4,6 +4,7 @@ const { expressMiddleware } = require('@as-integrations/express5');
 const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const depthLimit = require('graphql-depth-limit');
 const { createComplexityLimitRule } = require('graphql-validation-complexity');
 require('dotenv').config();
@@ -12,6 +13,7 @@ const db = require('./db');
 const models = require('./models');
 const typeDefs = require('./schema');
 const resolvers = require('./resolvers');
+const createLoaders = require('./loaders/user');
 
 const port = process.env.PORT || 4000;
 const DB_HOST = process.env.DB_HOST;
@@ -27,6 +29,13 @@ const getUser = (token) => {
   }
 };
 
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 async function startServer() {
   const app = express();
 
@@ -35,6 +44,7 @@ async function startServer() {
   app.use(helmet());
   app.use(cors());
   app.use(express.json());
+  app.use('/api', limiter);
 
   const server = new ApolloServer({
     typeDefs,
@@ -50,7 +60,7 @@ async function startServer() {
       context: async ({ req }) => {
         const token = req.headers.authorization;
         const user = getUser(token);
-        return { models, user };
+        return { models, user, loaders: createLoaders(models) };
       },
     }),
   );

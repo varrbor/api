@@ -24,7 +24,7 @@ module.exports = gql`
 
   type NoteFeed {
     notes: [Note]!
-    cursor: String!
+    cursor: String
     hasNextPage: Boolean!
   }
 

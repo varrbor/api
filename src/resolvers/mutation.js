@@ -2,9 +2,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { GraphQLError } = require('graphql');
 const mongoose = require('mongoose');
-require('dotenv').config();
 
 const gravatar = require('../util/gravatar');
+
+const JWT_EXPIRY = '7d';
 
 module.exports = {
   newNote: async (parent, args, { models, user }) => {
@@ -28,7 +29,12 @@ module.exports = {
     }
 
     const note = await models.Note.findById(id);
-    if (note && String(note.author) !== user.id) {
+    if (!note) {
+      throw new GraphQLError('Note not found', {
+        extensions: { code: 'NOT_FOUND' },
+      });
+    }
+    if (String(note.author) !== user.id) {
       throw new GraphQLError("You don't have permissions to delete the note", {
         extensions: { code: 'FORBIDDEN' },
       });
@@ -49,7 +55,12 @@ module.exports = {
     }
 
     const note = await models.Note.findById(id);
-    if (note && String(note.author) !== user.id) {
+    if (!note) {
+      throw new GraphQLError('Note not found', {
+        extensions: { code: 'NOT_FOUND' },
+      });
+    }
+    if (String(note.author) !== user.id) {
       throw new GraphQLError("You don't have permissions to update the note", {
         extensions: { code: 'FORBIDDEN' },
       });
@@ -69,9 +80,11 @@ module.exports = {
     }
 
     const noteCheck = await models.Note.findById(id);
-    const hasUser = noteCheck.favoritedBy.indexOf(user.id);
+    const hasUser = noteCheck.favoritedBy.some(
+      (favId) => favId.toString() === user.id,
+    );
 
-    if (hasUser >= 0) {
+    if (hasUser) {
       return await models.Note.findByIdAndUpdate(
         id,
         {
@@ -92,7 +105,25 @@ module.exports = {
     }
   },
   signUp: async (parent, { username, email, password }, { models }) => {
+    if (!username || username.trim().length < 3) {
+      throw new GraphQLError('Username must be at least 3 characters', {
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    }
+    if (!password || password.length < 8) {
+      throw new GraphQLError('Password must be at least 8 characters', {
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    }
+
     email = email.trim().toLowerCase();
+
+    if (!email.includes('@')) {
+      throw new GraphQLError('A valid email address is required', {
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    }
+
     const hashed = await bcrypt.hash(password, 10);
     const avatar = gravatar(email);
     try {
@@ -102,7 +133,9 @@ module.exports = {
         avatar,
         password: hashed,
       });
-      return jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+      return jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+        expiresIn: JWT_EXPIRY,
+      });
     } catch (err) {
       throw new Error('Error creating account');
     }
@@ -129,6 +162,8 @@ module.exports = {
       });
     }
 
-    return jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+    return jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: JWT_EXPIRY,
+    });
   },
 };
